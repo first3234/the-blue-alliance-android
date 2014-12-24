@@ -1,122 +1,195 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/match_container"
     android:layout_width="match_parent"
-    android:layout_height="80dp"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:baselineAligned="false"
+    android:clickable="true"
     android:orientation="horizontal"
     android:padding="8dp">
 
-    <TextView
+    <RelativeLayout
+        android:id="@+id/match_title_container"
         android:layout_width="0dp"
-        android:layout_height="fill_parent"
-        android:layout_weight="1.7"
-        android:id="@+id/match_title"
-        android:text="Match"
-        android:gravity="center_vertical|center_horizontal"
-        android:paddingRight="8dp" />
+        android:layout_height="match_parent"
+        android:layout_marginRight="8dp"
+        android:layout_weight="1.5">
+
+        <TextView
+            android:id="@+id/match_title"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_above="@+id/match_video"
+            android:layout_centerHorizontal="true"
+            android:gravity="center"
+            android:text="Quarters\n1 - 1" />
+
+        <ImageView
+            android:id="@id/match_video"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:clickable="false"
+            android:focusable="false"
+            android:src="@drawable/ic_action_play_over_video" />
+    </RelativeLayout>
 
     <TableLayout
         android:layout_width="0dp"
-        android:layout_height="fill_parent"
+        android:layout_height="wrap_content"
         android:layout_weight="6">
 
         <TableRow
-            android:layout_height="fill_parent"
-            android:background="@color/lighter_red"
-            android:minHeight="32dp">
+            android:id="@+id/column_headers_container"
+            android:background="@color/column_header_gray"
+            android:minHeight="32dp"
+            android:textAppearance="@android:style/TextAppearance.Medium"
+            android:visibility="visible">
 
             <TextView
+                android:id="@+id/teams_header"
                 android:layout_width="0dp"
                 android:layout_height="fill_parent"
-                android:layout_weight="1"
-                android:id="@+id/red1"
-                android:text="Red 1"
-                android:gravity="center_vertical|center_horizontal" />
+                android:layout_weight="3"
+                android:gravity="center_vertical|center_horizontal"
+                android:text="@string/teams"
+                android:textAppearance="@android:style/TextAppearance.Medium" />
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_height="fill_parent"
-                android:layout_weight="1"
-                android:id="@+id/red2"
-                android:text="Red 2"
-                android:gravity="center_vertical|center_horizontal" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="fill_parent"
-                android:layout_weight="1"
-                android:id="@+id/red3"
-                android:text="Red 3"
-                android:gravity="center_vertical|center_horizontal" />
-
-            <TextView
+                android:id="@+id/score_header"
                 android:layout_width="0dp"
                 android:layout_height="fill_parent"
                 android:layout_weight="1.5"
-                android:background="@color/light_red"
-                android:id="@+id/red_score"
-                android:text="Red Score"
-                android:textStyle="bold"
-                android:gravity="center_vertical|center_horizontal" />
+                android:gravity="center_vertical|center_horizontal"
+                android:text="@string/score"
+                android:textAppearance="@android:style/TextAppearance.Medium" />
+
+            <TextView
+                android:id="@+id/time_header"
+                android:layout_width="0dp"
+                android:layout_height="fill_parent"
+                android:layout_weight="1.5"
+                android:gravity="center_vertical|center_horizontal"
+                android:text="@string/time"
+                android:textAppearance="@android:style/TextAppearance.Medium" />
         </TableRow>
 
         <TableRow
+            android:id="@+id/alliances_and_scores"
+            android:layout_width="match_parent"
             android:layout_height="fill_parent"
-            android:background="@color/lighter_blue"
-            android:minHeight="32dp">
+            android:minHeight="40dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_weight="3">
+
+                <LinearLayout
+                    android:id="@+id/red_alliance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:minHeight="40dp">
+
+                    <TextView
+                        android:id="@+id/red1"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/match_team_selector_red"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Red 1" />
+
+                    <TextView
+                        android:id="@+id/red2"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/match_team_selector_red"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Red 2" />
+
+                    <TextView
+                        android:id="@+id/red3"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/match_team_selector_red"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Red 3" />
+
+                    <TextView
+                        android:id="@+id/red_score"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1.5"
+                        android:background="@color/light_red"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Red Score"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/blue_alliance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:minHeight="40dp">
+
+                    <TextView
+                        android:id="@+id/blue1"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/match_team_selector_blue"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Blue 1" />
+
+                    <TextView
+                        android:id="@+id/blue2"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/match_team_selector_blue"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Blue 2" />
+
+                    <TextView
+                        android:id="@+id/blue3"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/match_team_selector_blue"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Blue 3" />
+
+                    <TextView
+                        android:id="@+id/blue_score"
+                        android:layout_width="0dp"
+                        android:layout_height="fill_parent"
+                        android:layout_weight="1.5"
+                        android:background="@color/light_blue"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:text="Blue Score"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
+                android:id="@+id/match_time"
                 android:layout_width="0dp"
-                android:layout_height="fill_parent"
-                android:layout_weight="1"
-                android:id="@+id/blue1"
-                android:text="Blue 1"
-                android:gravity="center_vertical|center_horizontal" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="fill_parent"
-                android:layout_weight="1"
-                android:id="@+id/blue2"
-                android:text="Blue 2"
-                android:gravity="center_vertical|center_horizontal" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="fill_parent"
-                android:layout_weight="1"
-                android:id="@+id/blue3"
-                android:text="Blue 3"
-                android:gravity="center_vertical|center_horizontal" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="fill_parent"
+                android:layout_height="match_parent"
                 android:layout_weight="1.5"
-                android:background="@color/light_blue"
-                android:id="@+id/blue_score"
-                android:text="Blue Score"
-                android:textStyle="bold"
-                android:gravity="center_vertical|center_horizontal" />
+                android:gravity="center_horizontal|center_vertical"
+                android:text="88:88 PM" />
         </TableRow>
     </TableLayout>
 
-    <RelativeLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1.3">
-
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:padding="0dp"
-            android:layout_margin="0dp"
-            android:layout_centerInParent="true"
-            style="@android:style/Widget.Holo.Light.Button.Borderless.Small"
-            android:id="@+id/match_video"
-            android:src="@drawable/ic_action_play_over_video"
-            android:clickable="true"
-            android:focusable="false" />
-    </RelativeLayout>
 
 </LinearLayout>

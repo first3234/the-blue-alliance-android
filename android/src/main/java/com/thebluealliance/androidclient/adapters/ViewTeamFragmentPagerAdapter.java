@@ -1,13 +1,12 @@
 package com.thebluealliance.androidclient.adapters;
 
-import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 
-import com.thebluealliance.androidclient.activities.ViewTeamActivity;
-import com.thebluealliance.androidclient.fragments.EventListFragment;
+import com.thebluealliance.androidclient.fragments.team.TeamEventsFragment;
 import com.thebluealliance.androidclient.fragments.team.TeamInfoFragment;
+import com.thebluealliance.androidclient.fragments.team.TeamMediaFragment;
 
 /**
  * Created by Nathan on 4/22/2014.
@@ -38,16 +37,12 @@ public class ViewTeamFragmentPagerAdapter extends FragmentPagerAdapter {
         switch (position) {
             case 0: // info
                 // This is the info page
-                Fragment f = new TeamInfoFragment();
-                Bundle args = new Bundle();
-                args.putString(ViewTeamActivity.TEAM_KEY, mTeamKey);
-                f.setArguments(args);
-                return f;
+                return TeamInfoFragment.newInstance(mTeamKey);
             case 1: // events
-                return EventListFragment.newInstance(2014, -1, mTeamKey);
+                return TeamEventsFragment.newInstance(mTeamKey, -1);
             case 2: // media
             default:
-                return new Fragment();
+                return TeamMediaFragment.newInstance(mTeamKey, -1);
         }
 
     }

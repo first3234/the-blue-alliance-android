@@ -1,12 +1,18 @@
 language: android
+android:
+  components:
+    - platform-tools
+    - tools
+    - build-tools-21.0.1
+    - android-21
+    - extra-android-m2repository
+    - extra-google-m2repository
+    - extra-google-google_play_services
+    
 jdk: oraclejdk7
 env:
   matrix:
-    - ANDROID_TARGET=android-19  ANDROID_ABI=armeabi-v7a
-
-android:
-  components:
-    - build-tools-19.0.0
+    - ANDROID_TARGET=android-21  ANDROID_ABI=armeabi-v7a
 
 before_script:
   # Create and start emulator
@@ -16,3 +22,7 @@ before_script:
   - adb shell input keyevent 82 &
   
 script: ./gradlew connectedAndroidTest
+
+notifications:
+  slack: tba-android:g0OFNqSnj71KnQC8IHGXnzhj
+  email: false

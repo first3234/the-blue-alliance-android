@@ -1,400 +1,558 @@
 package com.thebluealliance.androidclient.models;
 
-import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.util.Log;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.thebluealliance.androidclient.Constants;
+import com.thebluealliance.androidclient.Utilities;
+import com.thebluealliance.androidclient.datafeed.APIResponse;
+import com.thebluealliance.androidclient.datafeed.DataManager;
 import com.thebluealliance.androidclient.datafeed.Database;
 import com.thebluealliance.androidclient.datafeed.JSONManager;
-import com.thebluealliance.androidclient.datatypes.EventListElement;
+import com.thebluealliance.androidclient.datafeed.RequestParams;
+import com.thebluealliance.androidclient.datafeed.TBAv2;
+import com.thebluealliance.androidclient.gcm.notifications.NotificationTypes;
+import com.thebluealliance.androidclient.helpers.EventHelper;
+import com.thebluealliance.androidclient.helpers.ModelInflater;
+import com.thebluealliance.androidclient.listitems.AllianceListElement;
+import com.thebluealliance.androidclient.listitems.EventListElement;
 
-import java.text.DateFormat;
+import org.apache.commons.lang3.StringUtils;
+
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
-import java.util.Iterator;
 
 
-public class Event implements BasicModel {
+public class Event extends BasicModel<Event> {
 
-    /* Do not insert any new entries above the existing enums!!!
-     * Things depend on their ordinal values, so you can only to the bottom of the list
-     */
-    public static enum TYPE {
-        NONE,
-        REGIONAL,
-        DISTRICT,
-        DISTRICT_CMP,
-        CMP_DIVISION,
-        CMP_FINALS,
-        OFFSEASON,
-        PRESEASON;
+    public static final String[] NOTIFICATION_TYPES = {
+            NotificationTypes.UPCOMING_MATCH,
+            NotificationTypes.MATCH_SCORE,
+            NotificationTypes.LEVEL_STARTING,
+            NotificationTypes.ALLIANCE_SELECTION,
+            NotificationTypes.AWARDS,
+            NotificationTypes.SCHEDULE_UPDATED,
+            NotificationTypes.FINAL_RESULTS
+    };
 
-        public String toString(){
-            switch(ordinal()){
-                default:
-                case 0:
-                    return "";
-                case 1:
-                    return "Regional Events";
-                case 2:
-                    return "District Events";
-                case 3:
-                    return "District Championship";
-                case 4:
-                    return "Championship Divisions";
-                case 5:
-                    return "Championship Finals";
-                case 6:
-                    return "Offseason Events";
-                case 7:
-                    return "Preseason Events";
-            }
-        }
-
-        public static TYPE fromString(String str) {
-            switch (str) {
-                case "Regional":
-                    return REGIONAL;
-                case "District":
-                    return DISTRICT;
-                case "District Championship":
-                    return DISTRICT_CMP;
-                case "Championship Division":
-                    return CMP_DIVISION;
-                case "Championship Finals":
-                    return CMP_FINALS;
-                case "Offseason":
-                    return OFFSEASON;
-                case "Preseason":
-                    return PRESEASON;
-                default:
-                    return NONE;
-            }
-        }
-
-        public static TYPE fromInt(int num) {
-            switch (num) {
-                case 0:
-                    return REGIONAL;
-                case 1:
-                    return DISTRICT;
-                case 2:
-                    return DISTRICT_CMP;
-                case 3:
-                    return CMP_DIVISION;
-                case 4:
-                    return CMP_FINALS;
-                case 99:
-                    return OFFSEASON;
-                case 100:
-                    return PRESEASON;
-                default:
-                    return NONE;
-            }
-        }
-    }
-
-    public static enum DISTRICT {
-        NONE,
-        FIM,  /* Michigan */
-        MAR,  /* Mid Atlantic */
-        NE,   /* New England */
-        PNW;  /* Pacific Northwest */
-
-        public static DISTRICT fromString(String str) {
-            /*
-			 * Not implemented on TBA yet. Write it here whenever it is...
-			 */
-            return NONE;
-        }
-    }
-
-    public static final DateFormat eventDateFormat = new SimpleDateFormat("yyyy-MM-dd",java.util.Locale.ENGLISH);
-    public static final SimpleDateFormat renderDateFormat = new SimpleDateFormat("MMM d, yyyy"),
-                                         shortRenderDateFormat = new SimpleDateFormat("MMM d"),
-                                         weekFormat = new SimpleDateFormat("w");
-
-    String 		eventKey,
-                eventName,
-                location,
-                shortName,
-                abbreviation,
-                website;
-    TYPE		eventType;
-    DISTRICT	eventDistrict;
-    Date		startDate,
-                endDate;
-    boolean		official;
-    long		last_updated;
-	JsonArray 	rankings,
-                webcasts,
-                teams,
-                matches;
-    JsonObject	stats;
+    private JsonArray matches, alliances, rankings, webcasts, teams;
+    private JsonObject stats, districtPoints;
 
     public Event() {
-        this.eventKey = "";
-        this.eventName = "";
-        this.shortName = "";
-        this.abbreviation = "";
-        this.location = "";
-        this.eventType = TYPE.NONE;
-        this.eventDistrict = DISTRICT.NONE;
-        this.startDate = new Date(0);
-        this.endDate = new Date(0);
-        this.official = false;
-        this.last_updated = -1;
-        website = "";
-        rankings = new JsonArray();
-        webcasts = new JsonArray();
-        teams = new JsonArray();
-        stats = new JsonObject();
+        super(Database.TABLE_EVENTS);
+        alliances = null;
+        rankings = null;
+        webcasts = null;
+        stats = null;
+        districtPoints = null;
     }
 
-    public Event(String eventKey, String eventName, String shortName, String abbreviation, String location, boolean official, TYPE eventType, DISTRICT eventDistrict, Date startDate, Date endDate,
-                 String website, JsonArray teams, JsonArray rankings, JsonArray webcasts, JsonObject stats, long last_updated) {
-        if(!Event.validateEventKey(eventKey)) throw new IllegalArgumentException("Invalid event key: "+eventKey+" Should be format <year><event>, like 2014cthar");
-        this.eventKey = eventKey;
-        this.eventName = eventName;
-        this.shortName = shortName;
-        this.abbreviation = abbreviation;
-        this.location = location;
-        this.eventType = eventType;
-        this.eventDistrict = eventDistrict;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.official = official;
-        this.last_updated = last_updated;
-        this.website = website;
-        this.rankings = rankings;
-        this.webcasts = webcasts;
-        this.stats = stats;
-        this.teams = teams;
+    public JsonArray getAlliances() throws FieldNotDefinedException {
+        if (alliances != null) {
+            return alliances;
+        }
+        if (fields.containsKey(Database.Events.ALLIANCES) && fields.get(Database.Events.ALLIANCES) instanceof String) {
+            alliances = JSONManager.getasJsonArray((String) fields.get(Database.Events.ALLIANCES));
+            return alliances;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.ALLIANCES is not defined");
+    }
+
+    public void setAlliances(JsonArray alliances) {
+        fields.put(Database.Events.ALLIANCES, alliances.toString());
+        this.alliances = alliances;
+    }
+
+    public void setAlliances(String allianceJson) {
+        fields.put(Database.Events.ALLIANCES, allianceJson);
     }
 
     public String getWebsite() {
-        return website;
+        if (fields.containsKey(Database.Events.WEBSITE) && fields.get(Database.Events.WEBSITE) instanceof String) {
+            return (String) fields.get(Database.Events.WEBSITE);
+        }
+        return "";
+    }
+
+    public int getEventYear() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.YEAR) && fields.get(Database.Events.YEAR) instanceof Integer) {
+            return (Integer) fields.get(Database.Events.YEAR);
+        } else {
+            try {
+                return Integer.parseInt(getEventKey().substring(0, 4));
+            } catch (FieldNotDefinedException e) {
+                throw new FieldNotDefinedException("Field Database.Events.YEAR is not defined");
+            }
+        }
     }
 
     public void setWebsite(String website) {
-        this.website = website;
+        fields.put(Database.Events.WEBSITE, website);
     }
 
-    public JsonArray getRankings() {
-        return rankings;
+    public JsonArray getRankings() throws FieldNotDefinedException {
+        if (rankings != null) {
+            return rankings;
+        }
+        if (fields.containsKey(Database.Events.RANKINGS) && fields.get(Database.Events.RANKINGS) instanceof String) {
+            rankings = JSONManager.getasJsonArray((String) fields.get(Database.Events.RANKINGS));
+            return rankings;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.RANKINGS is not defined");
+    }
+
+    public void setRankings(JsonArray rankings) {
+        fields.put(Database.Events.RANKINGS, rankings.toString());
+        this.rankings = rankings;
+    }
+
+    public void setRankings(String rankingsJson) {
+        fields.put(Database.Events.RANKINGS, rankingsJson);
+    }
+
+    public JsonArray getWebcasts() throws FieldNotDefinedException {
+        if (webcasts != null) {
+            return webcasts;
+        }
+        if (fields.containsKey(Database.Events.WEBCASTS) && fields.get(Database.Events.WEBCASTS) instanceof String) {
+            webcasts = JSONManager.getasJsonArray((String) fields.get(Database.Events.WEBCASTS));
+            return webcasts;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.WEBCASTS is not defined");
+    }
+
+    public void setWebcasts(JsonArray webcasts) {
+        fields.put(Database.Events.WEBCASTS, webcasts.toString());
+        this.webcasts = webcasts;
+    }
+
+    public void setWebcasts(String webcastJson) {
+        fields.put(Database.Events.WEBCASTS, webcastJson);
+    }
+
+    public JsonObject getStats() throws FieldNotDefinedException {
+        if (stats != null) {
+            return stats;
+        }
+        if (fields.containsKey(Database.Events.STATS) && fields.get(Database.Events.STATS) instanceof String) {
+            stats = JSONManager.getasJsonObject((String) fields.get(Database.Events.STATS));
+            return stats;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.STATS is not defined");
+    }
+
+    public void setStats(JsonObject stats) {
+        fields.put(Database.Events.STATS, stats.toString());
+        this.stats = stats;
+    }
+
+    public void setStats(String statsJson) {
+        fields.put(Database.Events.STATS, statsJson);
+    }
+
+
+    public String getEventKey() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.KEY) && fields.get(Database.Events.KEY) instanceof String) {
+            return (String) fields.get(Database.Events.KEY);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.KEY is not defined");
+    }
+
+    /**
+     * Gets the event key with the year stripped out.
+     *
+     * @return Event key without the year
+     */
+    public String getYearAgnosticEventKey() throws FieldNotDefinedException {
+        return getEventKey().replaceAll("[0-9]", "");
+    }
+
+    public void setEventKey(String eventKey) {
+        if (!EventHelper.validateEventKey(eventKey))
+            throw new IllegalArgumentException("Invalid event key: " + eventKey + " Should be format <year><event>, like 2014cthar");
+        fields.put(Database.Events.KEY, eventKey);
+        fields.put(Database.Events.YEAR, Integer.parseInt(eventKey.substring(0, 4)));
+    }
+
+    public String getEventName() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.NAME) && fields.get(Database.Events.NAME) instanceof String) {
+            return (String) fields.get(Database.Events.NAME);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.NAME is not defined");
+    }
+
+    public void setEventName(String eventName) {
+        fields.put(Database.Events.NAME, eventName);
+    }
+
+    public String getEventShortName() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.SHORTNAME) && fields.get(Database.Events.SHORTNAME) instanceof String) {
+            String shortName = (String) fields.get(Database.Events.SHORTNAME);
+            if (shortName != null && !shortName.isEmpty()) {
+                return shortName;
+            }
+        }
+        return getEventName();
+    }
+
+    public void setEventShortName(String eventShortName) { fields.put(Database.Events.SHORTNAME, eventShortName); }
+
+    public String getLocation() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.LOCATION) && fields.get(Database.Events.LOCATION) instanceof String) {
+            return (String) fields.get(Database.Events.LOCATION);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.LOCATION is not defined");
+    }
+
+    public void setLocation(String location) {
+        fields.put(Database.Events.LOCATION, location);
+    }
+
+    public String getVenue() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.VENUE) && fields.get(Database.Events.VENUE) instanceof String) {
+            return (String) fields.get(Database.Events.VENUE);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.VENUE is not defined");
+    }
+
+    public void setVenue(String venue) {
+        fields.put(Database.Events.VENUE, venue);
+    }
+
+    public EventHelper.TYPE getEventType() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.TYPE) && fields.get(Database.Events.TYPE) instanceof Integer) {
+            return EventHelper.TYPE.fromInt((Integer) fields.get(Database.Events.TYPE));
+        }
+        throw new FieldNotDefinedException("Field Database.Events.TYPE is not defined");
+    }
+
+    public void setEventType(EventHelper.TYPE eventType) {
+        fields.put(Database.Events.TYPE, eventType.ordinal());
+    }
+
+    public void setEventType(String typeString) {
+        fields.put(Database.Events.TYPE, EventHelper.TYPE.fromString(typeString).ordinal());
+    }
+
+    public void setEventType(int num) {
+        fields.put(Database.Events.TYPE, num);
+    }
+
+    public int getDistrictEnum() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.DISTRICT) && fields.get(Database.Events.DISTRICT) instanceof Integer) {
+            return (Integer) fields.get(Database.Events.DISTRICT);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.DISTRICT is not defined");
+    }
+
+    public void setDistrictEnum(int districtEnum) {
+        fields.put(Database.Events.DISTRICT, districtEnum);
+    }
+
+    public String getDistrictTitle() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.DISTRICT_STRING) && fields.get(Database.Events.DISTRICT_STRING) instanceof String) {
+            return (String) fields.get(Database.Events.DISTRICT_STRING);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.DISTRICT_STRING is not defined");
+    }
+
+    public void setDistrictTitle(String districtTitle) {
+        fields.put(Database.Events.DISTRICT_STRING, districtTitle);
+    }
+
+    public JsonObject getDistrictPoints() throws FieldNotDefinedException {
+        if (districtPoints != null) {
+            return districtPoints;
+        }
+        if (fields.containsKey(Database.Events.DISTRICT_POINTS) && fields.get(Database.Events.DISTRICT_POINTS) instanceof String) {
+            districtPoints = JSONManager.getasJsonObject((String) fields.get(Database.Events.DISTRICT_POINTS));
+            return districtPoints;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.DISTRICT_POINTS is not defined");
+    }
+
+    public void setDistrictPoints(String districtPoints) {
+        fields.put(Database.Events.DISTRICT_POINTS, districtPoints);
+    }
+
+    public Date getStartDate() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.START) && fields.get(Database.Events.START) instanceof Long) {
+            return new Date((Long) fields.get(Database.Events.START));
+        }
+        throw new FieldNotDefinedException("Field Database.Events.START is not defined");
+    }
+
+    public void setStartDate(Date startDate) {
+        fields.put(Database.Events.START, startDate.getTime());
+    }
+
+    public void setStartDate(String startString) {
+        if (startString == null || startString.isEmpty()) {
+            return;
+        }
+        try {
+            Date start = EventHelper.eventDateFormat.parse(startString);
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(start);
+            fields.put(Database.Events.START, start.getTime());
+            int week = Integer.parseInt(EventHelper.weekFormat.format(start)) - Utilities.getFirstCompWeek(cal.get(Calendar.YEAR));
+            setCompetitionWeek(week);
+        } catch (ParseException ex) {
+            //can't parse the date
+            throw new IllegalArgumentException("Invalid date format. Should be like yyyy-MM-dd");
+        }
+    }
+
+    public Date getEndDate() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.END) && fields.get(Database.Events.END) instanceof Long) {
+            return new Date((Long) fields.get(Database.Events.END));
+        }
+        throw new FieldNotDefinedException("Field Database.Events.END is not defined");
+    }
+
+    public void setEndDate(Date endDate) {
+        fields.put(Database.Events.END, endDate.getTime());
+    }
+
+    public void setEndDate(String endString) {
+        if (endString == null || endString.isEmpty()) {
+            return;
+        }
+        try {
+            fields.put(Database.Events.END, EventHelper.eventDateFormat.parse(endString).getTime());
+        } catch (ParseException ex) {
+            //can't parse the date
+            throw new IllegalArgumentException("Invalid date format. Should be like yyyy-MM-dd");
+        }
+    }
+
+    public int getCompetitionWeek() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.WEEK) && fields.get(Database.Events.WEEK) instanceof Integer) {
+            return (Integer) fields.get(Database.Events.WEEK);
+        }
+        throw new FieldNotDefinedException("Field Database.Events.WEEK is not defined");
+    }
+
+    public void setCompetitionWeek(int week) {
+        //all preseason events are week 0
+        fields.put(Database.Events.WEEK, Math.max(0, week));
     }
 
     public JsonArray getMatches() {
         return matches;
     }
 
+    /**
+     * Sets matches associated with this event model.
+     * Be careful! Matches aren't an official property, this method just exists as a continence.
+     * This model <b>WILL NOT</b> store the matches you set here.
+     *
+     * @param matches Match models to be temporarily associated with this event model.
+     */
     public void setMatches(JsonArray matches) {
         this.matches = matches;
     }
 
-    public ArrayList<Match> getMatchList(){
-        ArrayList<Match> matches = new ArrayList<>();
-        if(matches == null) return matches;
-        Iterator iterator = matches.iterator();
-        while(iterator!= null){
-            matches.add(JSONManager.getGson().fromJson((JsonObject)(iterator.next()),Match.class));
-        }
-        return matches;
-    }
-
-    public void setRankings(JsonArray rankings) {
-        this.rankings = rankings;
-    }
-
-    public JsonArray getWebcasts() {
-        return webcasts;
-    }
-
-    public void setWebcasts(JsonArray webcasts) {
-        this.webcasts = webcasts;
-    }
-
-    public JsonObject getStats() {
-        return stats;
-    }
-
-    public void setStats(JsonObject stats) {
-        this.stats = stats;
-    }
-
-
-    public static boolean validateEventKey(String key){
-        return key.matches("^[1-9]\\d{3}[a-z,0-9]+$");
-    }
-
-    public String getEventKey() {
-        return eventKey;
-    }
-
-    public void setEventKey(String eventKey) {
-        if(!Event.validateEventKey(eventKey)) throw new IllegalArgumentException("Invalid event key: "+eventKey+" Should be format <year><event>, like 2014cthar");
-        this.eventKey = eventKey;
-    }
-
-    public String getEventName() {
-        return eventName;
-    }
-
-    public void setEventName(String eventName) {
-        this.eventName = eventName;
-    }
-
-    public String getLocation() {
-        return location;
-    }
-
-    public void setLocation(String location) {
-        this.location = location;
-    }
-
-    public TYPE getEventType() {
-        return eventType;
-    }
-
-    public void setEventType(TYPE eventType) {
-        this.eventType = eventType;
-    }
-
-    public void setEventType(String typeString) {
-        this.eventType = TYPE.fromString(typeString);
-    }
-
-    public void setEventType(int num) {
-        this.eventType = TYPE.fromInt(num);
-    }
-
-    public DISTRICT getEventDistrict() {
-        return eventDistrict;
-    }
-
-    public void setEventDistrict(DISTRICT eventDistrict) {
-        this.eventDistrict = eventDistrict;
-    }
-
-    public void setEventDistrict(String districtString) {
-        this.eventDistrict = DISTRICT.fromString(districtString);
-    }
-
-    public Date getStartDate() {
-        return startDate;
-    }
-
-    public void setStartDate(Date startDate) {
-        this.startDate = startDate;
-    }
-
-    public void setStartDate(String startString) {
+    public boolean isHappeningNow() {
         try {
-            this.startDate = eventDateFormat.parse(startString);
-        } catch (ParseException ex) {
-            //can't parse the date
-            throw new IllegalArgumentException("Invalid date format. Should be like yyyy-MM-dd");
+            Date startDate = getStartDate(),
+                    endDate = getEndDate();
+
+            //since the Dates are at time 0:00, we need to add one day to the end date so that times during that day count as part of the event
+            Calendar c = Calendar.getInstance();
+            c.setTime(endDate);
+            c.add(Calendar.DATE, 1);
+            endDate = c.getTime();
+
+            if (startDate == null || endDate == null) return false;
+            Date now = new Date();
+            return now.after(startDate) && now.before(endDate);
+        } catch (FieldNotDefinedException e) {
+            Log.w(Constants.LOG_TAG, "Missing fields to determine if event is happening now.\n" +
+                    "Required fields: Database.Events.START and Database.Events.END");
+            return false;
         }
     }
 
-    public Date getEndDate() {
-        return endDate;
-    }
-
-    public void setEndDate(Date endDate) {
-        this.endDate = endDate;
-    }
-
-    public void setEndDate(String endString) {
+    public boolean hasStarted() {
         try {
-            this.endDate = eventDateFormat.parse(endString);
-        } catch (ParseException ex) {
-            //can't parse the date
-            throw new IllegalArgumentException("Invalid date format. Should be like yyyy-MM-dd");
+            Date startDate = getStartDate();
+            if (startDate == null) return false;
+            Date now = new Date();
+            return now.after(startDate);
+        } catch (FieldNotDefinedException e) {
+            Log.w(Constants.LOG_TAG, "Missing fields to determine if event has started.\n" +
+                    "Required fields: Database.Events.START");
+            return false;
         }
     }
 
-    public int getCompetitionWeek(){
-        if(startDate == null) return -1;
-        int week = Integer.parseInt(weekFormat.format(startDate))-8;
-        return week<0?0:week;
-    }
-
-    public boolean isHappeningNow(){
-        Date now = new Date();
-        return now.after(startDate) && now.before(endDate);
-    }
-
-    public boolean isOfficial() {
-        return official;
+    public boolean isOfficial() throws FieldNotDefinedException {
+        if (fields.containsKey(Database.Events.OFFICIAL) && fields.get(Database.Events.OFFICIAL) instanceof Integer) {
+            return (Integer) fields.get(Database.Events.OFFICIAL) == 1;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.OFFICIAL is not defined");
     }
 
     public void setOfficial(boolean official) {
-        this.official = official;
-    }
-
-    public String getAbbreviation() {
-        return abbreviation;
-    }
-
-    public void setAbbreviation(String abbreviation) {
-        this.abbreviation = abbreviation;
-    }
-
-    public String getShortName() {
-        return shortName;
-    }
-
-    public void setShortName(String shortName) {
-        this.shortName = shortName;
+        fields.put(Database.Events.OFFICIAL, official ? 1 : 0);
     }
 
     public void setTeams(JsonArray teams) {
+        fields.put(Database.Events.TEAMS, teams.toString());
         this.teams = teams;
     }
 
-    public JsonArray getTeams() {
-        return teams;
+    public void setTeams(String teamsJson) {
+        fields.put(Database.Events.TEAMS, teamsJson);
     }
 
-    public long getLastUpdated() {
-        return last_updated;
+    public JsonArray getTeams() throws FieldNotDefinedException {
+        if (teams != null) {
+            return teams;
+        }
+        if (fields.containsKey(Database.Events.TEAMS) && fields.get(Database.Events.TEAMS) instanceof String) {
+            teams = JSONManager.getasJsonArray((String) fields.get(Database.Events.TEAMS));
+            return teams;
+        }
+        throw new FieldNotDefinedException("Field Database.Events.TEAMS is not defined");
     }
 
-    public void setLastUpdated(long last_updated) {
-        this.last_updated = last_updated;
-    }
-
-    public String getDateString(){
-        return shortRenderDateFormat.format(startDate) + " to " + renderDateFormat.format(endDate);
-    }
-
-    public int getWeek(){
-        if(startDate == null) return -1;
-        int week = Integer.parseInt(weekFormat.format(startDate))-8;
-        return week<0?0:week;
+    public String getDateString() {
+        try {
+            Date startDate = getStartDate(),
+                    endDate = getEndDate();
+            if (startDate == null || endDate == null) return "";
+            if (startDate.equals(endDate)) {
+                return EventHelper.renderDateFormat.format(startDate);
+            }
+            return EventHelper.shortRenderDateFormat.format(startDate) + " to " + EventHelper.renderDateFormat.format(endDate);
+        } catch (FieldNotDefinedException e) {
+            Log.w(Constants.LOG_TAG, "Missing fields for getting date string. \n" +
+                    "Required fields: Database.Events.START, Database.Events.END");
+            return null;
+        }
     }
 
     @Override
     public EventListElement render() {
-        return new EventListElement(eventKey, eventName, getDateString() , location);
+        try {
+            return new EventListElement(getEventKey(), getEventShortName(), getDateString(), getLocation());
+        } catch (FieldNotDefinedException e) {
+            Log.w(Constants.LOG_TAG, "Missing fields for rendering event\n" +
+                    "Required fields: Database.Events.KEY, Database.Events.NAME, Database.Events.LOCATION");
+            return null;
+        }
+    }
+
+    public ArrayList<AllianceListElement> renderAlliances() {
+        try {
+            JsonArray alliances = getAlliances();
+            ArrayList<AllianceListElement> output = new ArrayList<>();
+            int counter = 1;
+            for (JsonElement alliance : alliances) {
+                JsonArray teams = alliance.getAsJsonObject().get("picks").getAsJsonArray();
+                output.add(new AllianceListElement(getEventKey(), counter, teams));
+                counter++;
+            }
+            return output;
+        } catch (FieldNotDefinedException e) {
+            Log.w(Constants.LOG_TAG, "Missing fields for rendering alliances.\n" +
+                    "Required field: Database.Events.ALLIANCES");
+            return null;
+        }
+    }
+
+    public String getSearchTitles() throws FieldNotDefinedException {
+        return getEventKey() + "," + getEventYear() + " " + getEventName() + "," + getEventYear() + " " + getEventShortName() + "," + getYearAgnosticEventKey() + " " + getEventYear();
+    }
+
+    public static synchronized APIResponse<Event> query(Context c, String eventKey, RequestParams requestParams, String[] fields, String whereClause, String[] whereArgs, String[] apiUrls) throws DataManager.NoDataException {
+        Log.d(Constants.DATAMANAGER_LOG, "Querying events table: " + whereClause + Arrays.toString(whereArgs));
+        Cursor cursor = Database.getInstance(c).safeQuery(Database.TABLE_EVENTS, fields, whereClause, whereArgs, null, null, null, null);
+        Event event;
+        if (cursor != null && cursor.moveToFirst()) {
+            event = ModelInflater.inflateEvent(cursor);
+            cursor.close();
+        } else {
+            event = new Event();
+        }
+
+        APIResponse.CODE code = requestParams.forceFromCache ? APIResponse.CODE.LOCAL : APIResponse.CODE.CACHED304;
+        boolean changed = false;
+        for (String url : apiUrls) {
+            APIResponse<String> response = TBAv2.getResponseFromURLOrThrow(c, url, requestParams);
+            if (response.getCode() == APIResponse.CODE.WEBLOAD || response.getCode() == APIResponse.CODE.UPDATED) {
+                Event updatedEvent;
+                if (StringUtils.countMatches(url, "/") == 6) {
+                    /* event info request - inflate the event
+                     * any other request will have an additional '/' in the URL
+                     * anybody got a better way to determine this?
+                     */
+                    updatedEvent = JSONManager.getGson().fromJson(response.getData(), Event.class);
+                } else {
+                    /* We're getting one of the other endpoints which don't contain event data.
+                     * Add them to the model based on which URL we hit
+                     */
+                    updatedEvent = new Event();
+                    updatedEvent.setEventKey(eventKey);
+                    EventHelper.addFieldByAPIUrl(updatedEvent, url, response.getData());
+                }
+                event.merge(updatedEvent);
+                changed = true;
+            }
+            code = APIResponse.mergeCodes(code, response.getCode());
+        }
+
+        if (changed) {
+            event.write(c);
+        }
+        Log.d(Constants.DATAMANAGER_LOG, "updated in db? " + changed);
+        return new APIResponse<>(event, code);
+    }
+
+    public static synchronized APIResponse<ArrayList<Event>> queryList(Context c, RequestParams requestParams, String[] fields, String whereClause, String[] whereArgs, String[] apiUrls) throws DataManager.NoDataException {
+        Log.d(Constants.DATAMANAGER_LOG, "Querying events table: " + whereClause + Arrays.toString(whereArgs));
+        Cursor cursor = Database.getInstance(c).safeQuery(Database.TABLE_EVENTS, fields, whereClause, whereArgs, null, null, null, null);
+        ArrayList<Event> events = new ArrayList<>();
+        if (cursor != null && cursor.moveToFirst()) {
+            do {
+                events.add(ModelInflater.inflateEvent(cursor));
+            } while (cursor.moveToNext());
+            cursor.close();
+        }
+
+        APIResponse.CODE code = requestParams.forceFromCache ? APIResponse.CODE.LOCAL : APIResponse.CODE.CACHED304;
+        boolean changed = false;
+        for (String url : apiUrls) {
+            APIResponse<String> response = TBAv2.getResponseFromURLOrThrow(c, url, requestParams);
+            if (response.getCode() == APIResponse.CODE.WEBLOAD || response.getCode() == APIResponse.CODE.UPDATED) {
+                JsonArray matchList = JSONManager.getasJsonArray(response.getData());
+                events = new ArrayList<>();
+                for (JsonElement m : matchList) {
+                    events.add(JSONManager.getGson().fromJson(m, Event.class));
+                }
+                changed = true;
+            }
+            code = APIResponse.mergeCodes(code, response.getCode());
+        }
+
+        if (changed) {
+            Database.getInstance(c).getEventsTable().storeEvents(events);
+        }
+        Log.d(Constants.DATAMANAGER_LOG, "Found " + events.size() + " events, updated in db? " + changed);
+        return new APIResponse<>(events, code);
     }
 
     @Override
-    public ContentValues getParams() {
-        ContentValues values = new ContentValues();
-        values.put(Database.Events.KEY,eventKey);
-        values.put(Database.Events.NAME,eventName);
-        values.put(Database.Events.LOCATION,location);
-        values.put(Database.Events.TYPE,eventType.ordinal());
-        values.put(Database.Events.DISTRICT,eventDistrict.ordinal());
-        values.put(Database.Events.START,eventDateFormat.format(startDate));
-        values.put(Database.Events.END,eventDateFormat.format(endDate));
-        values.put(Database.Events.OFFICIAL,official?1:0);
-        values.put(Database.Events.WEEK,getWeek());
-
-        return values;
+    public void write(Context c) {
+        Database.getInstance(c).getEventsTable().add(this);
     }
 }

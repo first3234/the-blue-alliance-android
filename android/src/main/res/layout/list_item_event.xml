@@ -1,39 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:minHeight="72dp"
+    android:padding="16dp">
 
     <TextView
-        style="@android:style/TextAppearance.DeviceDefault.Large"
+        android:id="@+id/event_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:id="@+id/event_name"
-        android:text="Title"
+        android:ellipsize="end"
         android:maxLines="1"
-        android:ellipsize="end" />
+        android:text="Title"
+        android:textSize="16sp"
+        android:textColor="@color/primary_text_color"/>
 
     <TextView
-        style="@android:style/TextAppearance.DeviceDefault.Small"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/event_name"
-        android:layout_alignParentRight="true"
         android:id="@+id/event_dates"
-        android:text="Dates" />
-
-    <TextView
-        style="@android:style/TextAppearance.DeviceDefault.Small"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
         android:layout_below="@id/event_name"
+        android:text="Dates"
+        android:textColor="@color/secondary_text_color"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/event_location"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
+        android:layout_below="@id/event_name"
         android:layout_toLeftOf="@id/event_dates"
         android:ellipsize="end"
         android:singleLine="true"
-        android:id="@+id/event_location"
-        android:text="Location" />
+        android:text="Location"
+        android:textColor="@color/secondary_text_color"
+        android:textSize="14sp" />
 </RelativeLayout>

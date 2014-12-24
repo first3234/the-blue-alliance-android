@@ -4,37 +4,69 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
+import com.google.android.gms.analytics.HitBuilders;
+import com.google.android.gms.analytics.Tracker;
+import com.thebluealliance.androidclient.Analytics;
+import com.thebluealliance.androidclient.Constants;
 import com.thebluealliance.androidclient.R;
 import com.thebluealliance.androidclient.activities.ViewTeamActivity;
-import com.thebluealliance.androidclient.background.PopulateTeamInfo;
-import com.thebluealliance.androidclient.interfaces.RefreshableActivityListener;
+import com.thebluealliance.androidclient.background.team.PopulateTeamInfo;
+import com.thebluealliance.androidclient.datafeed.RequestParams;
+import com.thebluealliance.androidclient.eventbus.LiveEventEventUpdateEvent;
+import com.thebluealliance.androidclient.eventbus.YearChangedEvent;
+import com.thebluealliance.androidclient.interfaces.RefreshListener;
+import com.thebluealliance.androidclient.listeners.TeamAtEventClickListener;
+import com.thebluealliance.androidclient.listitems.EventListElement;
 
 import java.util.List;
 
-public class TeamInfoFragment extends Fragment implements View.OnClickListener, RefreshableActivityListener {
+import de.greenrobot.event.EventBus;
+
+public class TeamInfoFragment extends Fragment implements View.OnClickListener, RefreshListener {
+
+    private static final String TEAM_KEY = "team_key";
+
+    private ViewTeamActivity parent;
 
     private String mTeamKey;
 
     private PopulateTeamInfo task;
 
-    public TeamInfoFragment() {
-        // Empty constructor
+
+
+    public static TeamInfoFragment newInstance(String teamKey) {
+        TeamInfoFragment fragment = new TeamInfoFragment();
+        Bundle args = new Bundle();
+        args.putString(TEAM_KEY, teamKey);
+        fragment.setArguments(args);
+        return fragment;
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mTeamKey = getArguments().getString(ViewTeamActivity.TEAM_KEY);
+        mTeamKey = getArguments().getString(TEAM_KEY);
         if (mTeamKey == null) {
             throw new IllegalArgumentException("TeamInfoFragment must be created with a team key!");
         }
+        if (!(getActivity() instanceof ViewTeamActivity)) {
+            throw new IllegalArgumentException("TeamMediaFragment must be hosted by a ViewTeamActivity!");
+        } else {
+            parent = (ViewTeamActivity) getActivity();
+        }
+
+        parent.registerRefreshListener(this);
     }
 
     @Override
@@ -43,57 +75,52 @@ public class TeamInfoFragment extends Fragment implements View.OnClickListener, 
         // Register this fragment as the callback for all clickable views
         v.findViewById(R.id.team_location_container).setOnClickListener(this);
         v.findViewById(R.id.team_twitter_button).setOnClickListener(this);
-        v.findViewById(R.id.team_most_recent_match_details).findViewById(R.id.match_video).setOnClickListener(this);
+        v.findViewById(R.id.team_cd_button).setOnClickListener(this);
+        v.findViewById(R.id.team_youtube_button).setOnClickListener(this);
+        v.findViewById(R.id.team_website_button).setOnClickListener(this);
+
         return v;
     }
 
     @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        //new PopulateTeamInfo(this, mTeamKey).execute();
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        parent.startRefresh(this);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (task != null) {
+            task.cancel(false);
+        }
+        EventBus.getDefault().unregister(this);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        task = new PopulateTeamInfo(getActivity(), this, mTeamKey);
-        task.execute();
+        EventBus.getDefault().register(this);
     }
 
     @Override
     public void onClick(View view) {
         PackageManager manager = getActivity().getPackageManager();
-        if (view.getId() == R.id.team_location_container) {
+        if (view.getTag() != null) {
+
             String uri = view.getTag().toString();
+
+            //social button was clicked. Track the call
+            Tracker t = Analytics.getTracker(Analytics.GAnalyticsTracker.ANDROID_TRACKER, getActivity());
+            t.send(new HitBuilders.EventBuilder()
+                    .setCategory("social_click")
+                    .setAction(uri)
+                    .setLabel(mTeamKey)
+                    .build());
+
             Intent i = new Intent(android.content.Intent.ACTION_VIEW, Uri.parse(uri));
             List<ResolveInfo> handlers = manager.queryIntentActivities(i, 0);
-            if (handlers.size() > 0) {
-                // There is an application to handle this intent intent
-                startActivity(i);
-            } else {
-                // No application can handle this intent
-                Toast.makeText(getActivity(), "No app can handle that request", Toast.LENGTH_SHORT).show();
-            }
-        } else if (view.getId() == R.id.team_twitter_button) {
-            String uri = view.getTag().toString();
-            Intent i = new Intent(android.content.Intent.ACTION_VIEW, Uri.parse(uri));
-            List<ResolveInfo> handlers = manager.queryIntentActivities(i, 0);
-            if (handlers.size() > 0) {
-                // There is an application to handle this intent intent
-                //TODO: Figure out if the Twitter app supports initiating searches via an Intent
-                //startActivity(i);
-            } else {
-                // No application can handle this intent
-                Toast.makeText(getActivity(), "No app can handle that request", Toast.LENGTH_SHORT).show();
-            }
-        } else if (view.getId() == R.id.team_youtube_button) {
-            String query = view.getTag().toString();
-            Intent i = new Intent(Intent.ACTION_SEARCH);
-            i.setPackage("com.google.android.youtube");
-            i.putExtra("query", query);
-            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            List<ResolveInfo> handlers = manager.queryIntentActivities(i, 0);
-            if (handlers.size() > 0) {
+            if (!handlers.isEmpty()) {
                 // There is an application to handle this intent intent
                 startActivity(i);
             } else {
@@ -103,14 +130,57 @@ public class TeamInfoFragment extends Fragment implements View.OnClickListener, 
         }
     }
 
+
+
     @Override
-    public void onRefreshStart() {
-        task = new PopulateTeamInfo(getActivity(), this, mTeamKey);
-        task.execute();
+    public void onRefreshStart(boolean actionIconPressed) {
+        Log.i(Constants.REFRESH_LOG, "Loading " + mTeamKey + " info");
+        task = new PopulateTeamInfo(this, new RequestParams(true, actionIconPressed));
+        task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, mTeamKey);
     }
 
     @Override
     public void onRefreshStop() {
-        task.cancel(false);
+        if (task != null) {
+            task.cancel(false);
+        }
+    }
+
+    public void updateTask(PopulateTeamInfo newTask) {
+        task = newTask;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        parent.unregisterRefreshListener(this);
+    }
+
+    public void showCurrentEvent(final EventListElement event) {
+
+        final LinearLayout eventLayout = (LinearLayout) getView().findViewById(R.id.team_current_event);
+        final RelativeLayout container = (RelativeLayout) getView().findViewById(R.id.team_current_event_container);
+
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                eventLayout.removeAllViews();
+                eventLayout.addView(event.getView(getActivity(), getActivity().getLayoutInflater(), null));
+
+                container.setVisibility(View.VISIBLE);
+                container.setTag(mTeamKey + "@" + event.getEventKey());
+                container.setOnClickListener(new TeamAtEventClickListener(getActivity()));
+            }
+        });
+    }
+
+    public void onEvent(YearChangedEvent event) {
+        parent.notifyRefreshComplete(this);
+    }
+
+    public void onEvent(LiveEventEventUpdateEvent event) {
+        if (event.getEvent() != null) {
+            showCurrentEvent(event.getEvent().render());
+        }
     }
 }

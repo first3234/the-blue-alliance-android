@@ -1,25 +1,32 @@
 package com.thebluealliance.androidclient.adapters;
 
 import android.app.Activity;
-import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseExpandableListAdapter;
-import android.widget.CheckedTextView;
+import android.widget.TextView;
 
 import com.thebluealliance.androidclient.R;
-import com.thebluealliance.androidclient.datatypes.ListGroup;
+import com.thebluealliance.androidclient.listitems.ListGroup;
+
+import java.util.ArrayList;
 
 /**
  * File created by phil on 4/22/14.
  */
-public abstract class ExpandableListAdapter extends BaseExpandableListAdapter {
-    public final SparseArray<ListGroup> groups;
+public class ExpandableListAdapter extends BaseExpandableListAdapter {
+
+    public final ArrayList<ListGroup> groups;
     public LayoutInflater inflater;
     public Activity activity;
+    private boolean mIsChildSelectable = true;
 
-    public ExpandableListAdapter(Activity act, SparseArray<ListGroup> groups) {
+    public ExpandableListAdapter() {
+        groups = new ArrayList<>();
+    }
+
+    public ExpandableListAdapter(Activity act, ArrayList<ListGroup> groups) {
         activity = act;
         this.groups = groups;
         inflater = act.getLayoutInflater();
@@ -28,10 +35,6 @@ public abstract class ExpandableListAdapter extends BaseExpandableListAdapter {
     @Override
     public Object getChild(int groupPosition, int childPosition) {
         return groups.get(groupPosition).children.get(childPosition);
-    }
-
-    public Object getChildKey(int groupPosition, int childPosition) {
-        return groups.get(groupPosition).childrenKeys.get(childPosition);
     }
 
     @Override
@@ -49,6 +52,14 @@ public abstract class ExpandableListAdapter extends BaseExpandableListAdapter {
     @Override
     public Object getGroup(int groupPosition) {
         return groups.get(groupPosition);
+    }
+
+    public void addGroup(int position, ListGroup group) {
+        groups.add(position, group);
+    }
+
+    public void addGroup(ListGroup group) {
+        groups.add(group);
     }
 
     @Override
@@ -77,8 +88,7 @@ public abstract class ExpandableListAdapter extends BaseExpandableListAdapter {
             convertView = inflater.inflate(R.layout.expandable_list_group, null);
         }
         ListGroup group = (ListGroup) getGroup(groupPosition);
-        ((CheckedTextView) convertView).setText(group.string);
-        ((CheckedTextView) convertView).setChecked(isExpanded);
+        ((TextView) convertView.findViewById(R.id.group_name)).setText(group.string);
 
         return convertView;
     }
@@ -90,6 +100,16 @@ public abstract class ExpandableListAdapter extends BaseExpandableListAdapter {
 
     @Override
     public boolean isChildSelectable(int groupPosition, int childPosition) {
-        return false;
+        return mIsChildSelectable;
+    }
+
+    public void setChildSelectable(boolean isSelectable) {
+        mIsChildSelectable = isSelectable;
+    }
+
+    @Override
+    public View getChildView(int groupPosition, int childPosition, boolean isLastChild, View convertView, ViewGroup parent) {
+        return groups.get(groupPosition).children.get(childPosition).render().getView(activity, inflater, convertView);
     }
 }
+

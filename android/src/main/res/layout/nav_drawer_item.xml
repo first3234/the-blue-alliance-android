@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:minHeight="?android:attr/listPreferredItemHeightLarge"
-    android:orientation="horizontal"
-    android:background="@color/nav_drawer_item_background">
+    android:minHeight="48dp">
 
-    <ImageView
+    <com.thebluealliance.androidclient.views.SelectableImage
         android:id="@+id/icon"
         style="@style/NavDrawerIconStyle" />
 
@@ -14,4 +12,4 @@
         android:id="@+id/title"
         style="@style/NavDrawerLabelStyle" />
 
-</LinearLayout>
+</RelativeLayout>

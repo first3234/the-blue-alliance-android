@@ -1,6 +1,6 @@
 package com.thebluealliance.androidclient.datafeed;
 
-import com.thebluealliance.androidclient.models.SimpleTeam;
+import com.thebluealliance.androidclient.models.Team;
 
 import java.io.Reader;
 import java.io.StringReader;
@@ -14,8 +14,8 @@ import java.util.Vector;
  */
 public class CSVManager {
 
-    public static ArrayList<SimpleTeam> parseTeamsFromCSV(String CSV) {
-        ArrayList<SimpleTeam> teams = new ArrayList<>();
+    public static ArrayList<Team> parseTeamsFromCSV(String CSV) {
+        ArrayList<Team> teams = new ArrayList<>();
 
         Reader reader = new StringReader(CSV);
         try {
@@ -23,13 +23,17 @@ public class CSVManager {
             int i = 1;
             while (values != null) {
                 StringBuilder sb = new StringBuilder();
-                if (values.get(1).toLowerCase().equals("none")) {
+                if (values.size() < 4 || values.get(1).toLowerCase().equals("none")) {
                     values = CSVHelper.parseLine(reader);
                     continue;
                 }
                 String teamKey = "frc" + values.get(0);
                 try {
-                    SimpleTeam team = new SimpleTeam(teamKey, Integer.parseInt(values.get(0)), values.get(2), values.get(3), -1);
+                    String teamName = values.get(2);
+                    if (teamName.isEmpty()) {
+                        teamName = "Team " + Integer.parseInt(values.get(0));
+                    }
+                    Team team = new Team(teamKey, Integer.parseInt(values.get(0)), teamName, values.get(3));
                     teams.add(team);
                 } catch (NumberFormatException e) {
                     // Invalid team number. Probably the column header.
